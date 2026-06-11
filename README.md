@@ -62,10 +62,10 @@ npm install
 cp .env.example .env
 ```
 
-Now open the `.env` file in any text editor and replace `your\\\_api\\\_key\\\_here` with your actual key:
+Now open the `.env` file in any text editor and replace `your\\\\\\\_api\\\\\\\_key\\\\\\\_here` with your actual key:
 
 ```
-GEMINI\\\_API\\\_KEY=your\\\_key\\\_here
+GEMINI\\\\\\\_API\\\\\\\_KEY=your\\\\\\\_key\\\\\\\_here
 ```
 
 \---
