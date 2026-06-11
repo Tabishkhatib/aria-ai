@@ -11,6 +11,8 @@ A product-ready AI assistant with auth, branding, company knowledge base, chat h
 * **Company knowledge base** — Paste text or upload PDF/Word/TXT files. Aria uses this in every reply.
 * **Chat history** — Conversations saved per user, persistent across sessions.
 * **Usage dashboard** — Admin-only view with message counts, token usage, activity chart, and team list.
+* RAG (Retrieval Augmented Generation) — documents are chunked, embedded and stored in ChromaDB. Only the most relevant chunks are sent to the AI per question.
+* Vector search — uses Gemini text-embedding-004 model for semantic search across hundreds of documents.
 
 \---
 
@@ -37,9 +39,13 @@ You should see something like `v20.x.x`
 
 2\. Sign in with Google
 
-3\. Click Get API Key → Create API key
+3\. Run: pip install chromadb
 
-4\. Copy the key — it starts with AIza...---
+4\. Run: npm install chromadb @google/generative-ai
+
+5\. Click Get API Key → Create API key
+
+6\. Copy the key — it starts with AIza...---
 
 ### Step 3 — Set up the project
 
@@ -56,15 +62,29 @@ npm install
 cp .env.example .env
 ```
 
-Now open the `.env` file in any text editor and replace `your\_api\_key\_here` with your actual key:
+Now open the `.env` file in any text editor and replace `your\\\_api\\\_key\\\_here` with your actual key:
 
 ```
-GEMINI\_API\_KEY=your\_key\_here
+GEMINI\\\_API\\\_KEY=your\\\_key\\\_here
 ```
 
 \---
 
 ### Step 4 — Run it
+
+You need TWO terminal windows:
+
+
+
+Terminal 1 — start ChromaDB:
+
+chroma run --path ./chroma-data
+
+
+
+Terminal 2 — start the app:
+
+node start.js
 
 ```bash
 node start.js
