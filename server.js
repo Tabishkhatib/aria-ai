@@ -8,8 +8,7 @@ import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import PDFParser from 'pdf2json';
 import mammoth from 'mammoth';
-import { ChromaClient } from 'chromadb';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Pinecone } from '@pinecone-database/pinecone';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -20,31 +19,31 @@ const DB_PATH = path.join(__dirname, 'data', 'db.json');
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-// ── ChromaDB client ───────────────────────────────────────────────
-const chroma = new ChromaClient({ path: 'http://localhost:8000' });
-let collection;
-
-async function initChroma() {
-  try {
-    collection = await chroma.getOrCreateCollection({ name: 'company_kb' });
-    console.log('✅ ChromaDB connected');
-  } catch (err) {
-    console.error('❌ ChromaDB not running. Start it with: chroma run --path ./chroma-data');
-  }
-}
-initChroma();
+// ── Pinecone client ───────────────────────────────────────────────
+const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+const index = pinecone.index('company-kb');
+console.log('✅ Pinecone connected');
 
 // ── Gemini embedding function ─────────────────────────────────────
 async function getEmbedding(text) {
   const apiKey = process.env.GEMINI_API_KEY;
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
-  const result = await model.embedContent(text);
-  return result.embedding.values;
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: { parts: [{ text }] }
+      })
+    }
+  );
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.embedding.values;
 }
 
 // ── Chunk text into smaller pieces ───────────────────────────────
-function chunkText(text, chunkSize = 500, overlap = 50) {
+function chunkText(text, chunkSize = 5000, overlap = 200) {
   const words = text.split(/\s+/);
   const chunks = [];
   for (let i = 0; i < words.length; i += chunkSize - overlap) {
@@ -54,51 +53,55 @@ function chunkText(text, chunkSize = 500, overlap = 50) {
   return chunks;
 }
 
-// ── Add document to ChromaDB ──────────────────────────────────────
+// ── Add document to Pinecone ──────────────────────────────────────
 async function addToVectorDB(fileId, fileName, text) {
-  if (!collection) throw new Error('ChromaDB not connected');
-
   const chunks = chunkText(text);
-  const ids = [];
-  const embeddings = [];
-  const metadatas = [];
-  const documents = [];
-
   console.log(`Embedding ${chunks.length} chunks for "${fileName}"...`);
 
+  const vectors = [];
   for (let i = 0; i < chunks.length; i++) {
     const embedding = await getEmbedding(chunks[i]);
-    ids.push(`${fileId}_chunk_${i}`);
-    embeddings.push(embedding);
-    metadatas.push({ fileId, fileName, chunkIndex: i });
-    documents.push(chunks[i]);
+    await new Promise(r => setTimeout(r, 300));
+    vectors.push({
+      id: `${fileId}_chunk_${i}`,
+      values: embedding,
+      metadata: { fileId, fileName, chunkIndex: i, text: chunks[i] }
+    });
   }
 
-  await collection.add({ ids, embeddings, metadatas, documents });
+  // Upsert in batches of 100
+  const batchSize = 100;
+  for (let i = 0; i < vectors.length; i += batchSize) {
+    await index.upsert(vectors.slice(i, i + batchSize));
+  }
+
   console.log(`✅ Added ${chunks.length} chunks for "${fileName}"`);
 }
 
-// ── Remove document from ChromaDB ────────────────────────────────
+// ── Remove document from Pinecone ────────────────────────────────
 async function removeFromVectorDB(fileId) {
-  if (!collection) return;
-  const results = await collection.get({ where: { fileId } });
-  if (results.ids.length > 0) {
-    await collection.delete({ ids: results.ids });
-    console.log(`Deleted ${results.ids.length} chunks for fileId: ${fileId}`);
+  try {
+    await index.deleteMany({ fileId });
+    console.log(`Deleted chunks for fileId: ${fileId}`);
+  } catch (err) {
+    console.error('Delete error:', err.message);
   }
 }
 
 // ── Retrieve relevant chunks for a query ─────────────────────────
 async function retrieveRelevantChunks(query, topK = 5) {
-  if (!collection) return '';
   try {
     const queryEmbedding = await getEmbedding(query);
-    const results = await collection.query({
-      queryEmbeddings: [queryEmbedding],
-      nResults: topK
+    const results = await index.query({
+      vector: queryEmbedding,
+      topK,
+      includeMetadata: true
     });
-    if (!results.documents?.[0]?.length) return '';
-    return results.documents[0].join('\n\n---\n\n');
+    if (!results.matches?.length) return '';
+    return results.matches
+      .map(m => m.metadata?.text || '')
+      .filter(Boolean)
+      .join('\n\n---\n\n');
   } catch (err) {
     console.error('Retrieval error:', err.message);
     return '';
@@ -132,7 +135,7 @@ const upload = multer({
   dest: UPLOADS_DIR,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowed = ['.pdf', '.txt', '.docx', '.doc', '.md'];
+    const allowed = ['.pdf', '.txt', '.docx', '.doc', '.md', '.xlsx', '.xls', '.csv'];
     const ext = path.extname(file.originalname).toLowerCase();
     cb(null, allowed.includes(ext));
   }
@@ -237,6 +240,16 @@ app.post('/api/kb/upload', requireAuth, upload.single('file'), async (req, res) 
     if (ext === '.txt' || ext === '.md') text = fs.readFileSync(req.file.path, 'utf8');
     else if (ext === '.pdf') text = await extractPDF(req.file.path);
     else if (ext === '.docx' || ext === '.doc') { const r = await mammoth.extractRawText({ path: req.file.path }); text = r.value; }
+    else if (ext === '.csv') text = fs.readFileSync(req.file.path, 'utf8');
+    else if (ext === '.xlsx' || ext === '.xls') {
+      const XLSXmod = await import('xlsx');
+      const XLSX = XLSXmod.default;
+      const workbook = XLSX.readFile(req.file.path);
+      text = workbook.SheetNames.map(name => {
+        const sheet = workbook.Sheets[name];
+        return `Sheet: ${name}\n` + XLSX.utils.sheet_to_csv(sheet);
+      }).join('\n\n');
+    }
     fs.unlinkSync(req.file.path);
 
     const fileId = Date.now().toString();
@@ -315,10 +328,8 @@ app.post('/api/chat', requireAuth, async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not set in environment' });
 
-  // ── RAG: retrieve relevant context ──
   const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || '';
   const relevantContext = await retrieveRelevantChunks(lastUserMessage, 5);
-
   const systemPrompt = buildSystemPrompt(user, relevantContext);
 
   try {
@@ -404,5 +415,5 @@ app.get('/api/admin/usage', requireAuth, (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`\n✅ Aria AI running at http://localhost:${PORT}`);
-  console.log(`\n📋 Make sure ChromaDB is running: chroma run --path ./chroma-data\n`);
+  console.log(`\n📋 No ChromaDB needed — using Pinecone cloud vector DB\n`);
 });
