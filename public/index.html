@@ -140,7 +140,9 @@
   #sub-panel-body { flex:1; overflow-y:auto; padding:20px 16px; }
 
   /* CHAT PANEL — always full width, sidebar overlays on top */
-  #chat-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; background:var(--bg); width:100%; }
+  #chat-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; background:var(--bg); width:100%; margin-left:0; transition:margin-left 0.32s cubic-bezier(0.4,0,0.2,1); }
+  #chat-panel.sidebar-open { margin-left:var(--sidebar-w); }
+  #chat-panel.sub-open { margin-left:calc(var(--sidebar-w) + 320px); }
   #chat-topbar { height:54px; border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 20px 0 36px; gap:12px; }
   .online-dot { width:8px; height:8px; border-radius:50%; background:#1D9E75; flex-shrink:0; }
   .topbar-name { font-size:14px; font-weight:600; }
@@ -412,7 +414,8 @@ function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('open',sidebarOpen);
   document.getElementById('sidebar-toggle').classList.toggle('open',sidebarOpen);
   document.getElementById('toggle-icon').className=sidebarOpen?'ti ti-chevron-left':'ti ti-chevron-right';
-  if(!sidebarOpen) closeSub();
+  document.getElementById('chat-panel').classList.toggle('sidebar-open',sidebarOpen);
+  if(!sidebarOpen){closeSub();document.getElementById('chat-panel').classList.remove('sub-open');}
 }
 
 // ── Sub panel ─────────────────────────────────────────────────────
@@ -432,6 +435,7 @@ function openSub(name){
   document.getElementById('sub-panel-icon').style.cssText='font-size:18px;color:var(--accent)';
   document.getElementById('sub-panel-body').innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:40px 0">Loading…</div>';
   document.getElementById('sub-panel').classList.add('open');
+  document.getElementById('chat-panel').classList.add('sub-open');
   ['kb','settings','dashboard'].forEach(n=>document.getElementById('nav-'+n)?.classList.remove('active'));
   document.getElementById('nav-'+name)?.classList.add('active');
   cfg.render();
@@ -439,6 +443,7 @@ function openSub(name){
 
 function closeSub(){
   document.getElementById('sub-panel').classList.remove('open');
+  document.getElementById('chat-panel').classList.remove('sub-open');
   currentSub=null;
   ['kb','settings','dashboard'].forEach(n=>document.getElementById('nav-'+n)?.classList.remove('active'));
 }
