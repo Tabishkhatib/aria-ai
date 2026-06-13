@@ -412,16 +412,7 @@ app.get('/api/admin/usage', requireAuth, (req, res) => {
 
   res.json({ totalMessages, totalTokensIn, totalTokensOut, perUser: Object.values(perUser), daily, users, recentUsage: usage.slice(-50).reverse() });
 });
-app.get('/reset-password', async (req, res) => {
-  const { email, newpass, secret } = req.query;
-  if (secret !== 'aria-reset-2024') return res.send('Wrong secret');
-  const db = readDB();
-  const user = db.users.find(u => u.email === email);
-  if (!user) return res.send('User not found');
-  user.password = await bcrypt.hash(newpass, 10);
-  writeDB(db);
-  res.send('Password updated!');
-});
+
 
 app.listen(PORT, () => {
   console.log(`\n✅ Aria AI running at http://localhost:${PORT}`);
