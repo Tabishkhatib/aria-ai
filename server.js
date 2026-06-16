@@ -125,7 +125,7 @@ function writeDB(data) {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
-  secret: 'aria-secret-key-change-in-production',
+  secret: process.env.SESSION_SECRET || 'aria-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 }
