@@ -73,16 +73,6 @@ async function addToVectorDB(fileId, fileName, text) {
   console.log(`✅ Added ${chunks.length} chunks for "${fileName}"`);
 }
 
-  // Upsert in batches of 100
-  const batchSize = 100;
-  for (let i = 0; i < vectors.length; i += batchSize) {
-    const batch = vectors.slice(i, i + batchSize);
-    console.log('Upserting batch of', batch.length, 'vectors');
-     await index.upsert(batch);
-  }
-
-  console.log(`✅ Added ${chunks.length} chunks for "${fileName}"`);
-
 
 // ── Remove document from Pinecone ────────────────────────────────
 async function removeFromVectorDB(fileId) {
