@@ -82,7 +82,7 @@ async function addToVectorDB(fileId, fileName, text) {
   }
 
   console.log(`✅ Added ${chunks.length} chunks for "${fileName}"`);
-}
+
 
 // ── Remove document from Pinecone ────────────────────────────────
 async function removeFromVectorDB(fileId) {
