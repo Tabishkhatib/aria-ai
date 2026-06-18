@@ -59,16 +59,19 @@ async function addToVectorDB(fileId, fileName, text) {
   console.log(`Text length: ${text.length}, Chunks: ${chunks.length} for "${fileName}"...`);
   if (chunks.length === 0) throw new Error('No chunks generated from text');
 
-  const vectors = [];
   for (let i = 0; i < chunks.length; i++) {
     const embedding = await getEmbedding(chunks[i]);
-    await new Promise(r => setTimeout(r, 300));
-    vectors.push({
+    await index.upsert([{
       id: `${fileId}_chunk_${i}`,
       values: embedding,
       metadata: { fileId, fileName, chunkIndex: i, text: chunks[i] }
-    });
+    }]);
+    console.log(`Upserted chunk ${i + 1}/${chunks.length}`);
+    await new Promise(r => setTimeout(r, 500));
   }
+
+  console.log(`✅ Added ${chunks.length} chunks for "${fileName}"`);
+}
 
   // Upsert in batches of 100
   const batchSize = 100;
