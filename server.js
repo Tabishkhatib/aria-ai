@@ -61,11 +61,13 @@ async function addToVectorDB(fileId, fileName, text) {
 
   for (let i = 0; i < chunks.length; i++) {
     const embedding = await getEmbedding(chunks[i]);
-    await index.upsert([{
-      id: `${fileId}_chunk_${i}`,
-      values: embedding,
-      metadata: { fileId, fileName, chunkIndex: i, text: chunks[i] }
-    }]);
+    await index.upsert({
+      records: [{
+        id: `${fileId}_chunk_${i}`,
+        values: embedding,
+        metadata: { fileId, fileName, chunkIndex: i, text: chunks[i] }
+     }]
+   });
     console.log(`Upserted chunk ${i + 1}/${chunks.length}`);
     await new Promise(r => setTimeout(r, 500));
   }
