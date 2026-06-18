@@ -56,7 +56,8 @@ function chunkText(text, chunkSize = 5000, overlap = 200) {
 // ── Add document to Pinecone ──────────────────────────────────────
 async function addToVectorDB(fileId, fileName, text) {
   const chunks = chunkText(text);
-  console.log(`Embedding ${chunks.length} chunks for "${fileName}"...`);
+  console.log(`Text length: ${text.length}, Chunks: ${chunks.length} for "${fileName}"...`);
+  if (chunks.length === 0) throw new Error('No chunks generated from text');
 
   const vectors = [];
   for (let i = 0; i < chunks.length; i++) {
@@ -81,7 +82,7 @@ async function addToVectorDB(fileId, fileName, text) {
 // ── Remove document from Pinecone ────────────────────────────────
 async function removeFromVectorDB(fileId) {
   try {
-    await index.deleteMany({ fileId });
+    await index.deleteMany({ filter: { fileId: { '$eq': fileId } } });
     console.log(`Deleted chunks for fileId: ${fileId}`);
   } catch (err) {
     console.error('Delete error:', err.message);
@@ -252,9 +253,12 @@ app.post('/api/kb/upload', requireAuth, upload.single('file'), async (req, res) 
     }
     fs.unlinkSync(req.file.path);
 
-    const fileId = Date.now().toString();
-    await addToVectorDB(fileId, req.file.originalname, text);
+    if (!text || text.trim().length < 20) {
+      return res.status(400).json({ error: 'Could not extract text from this file. Try a different PDF or paste the text manually.' });
+    }
 
+const fileId = Date.now().toString();
+await addToVectorDB(fileId, req.file.originalname, text);
     if (!db.kb) db.kb = [];
     db.kb.push({ id: fileId, name: req.file.originalname, chars: text.length, added_at: new Date().toISOString(), added_by: user.name });
     writeDB(db);
