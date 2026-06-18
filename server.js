@@ -252,6 +252,9 @@ app.post('/api/kb/upload', requireAuth, upload.single('file'), async (req, res) 
       }).join('\n\n');
     }
     fs.unlinkSync(req.file.path);
+    console.log('Extracted text length:', text.length);
+    console.log('Text preview:', text.slice(0, 200));
+
 
     if (!text || text.trim().length < 20) {
       return res.status(400).json({ error: 'Could not extract text from this file. Try a different PDF or paste the text manually.' });
