@@ -21,7 +21,7 @@ fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // ── Pinecone client ───────────────────────────────────────────────
 const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-const index = pinecone.index('company-kb');
+const index = pinecone.index('demo');
 console.log('✅ Pinecone connected');
 
 // ── Gemini embedding function ─────────────────────────────────────
