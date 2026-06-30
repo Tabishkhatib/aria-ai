@@ -369,7 +369,7 @@ app.post('/api/chat', requireAuth, async (req, res) => {
 });
 
 function buildSystemPrompt(user, relevantContext) {
-  let prompt = `You are ${user.brand_name || 'Aria'}, a professional and helpful AI assistant for ${user.company || 'this company'}.
+  let prompt = `You are ${user.brand_name || 'Aria'}, a professional and helpful AI assistant for ${user.company || 'this company'},developed by tabish.corp.
 
 Your personality:
 - Warm but professional — like a brilliant senior colleague
